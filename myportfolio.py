@@ -10,6 +10,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 import mplfinance as mpf
 
+# ___
+# Defining constants
+
+POSSIBLE_MAV = ["10", "20", "50", "100", "200"]
+POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "1y"]
+POSSIBLE_PLOT_TYPES = ["candle", "line", "pnf", "renko"]
+
+# ___
+
 
 def main():
     # User interface setup, starting with the basic widgets
@@ -24,31 +33,24 @@ def main():
     end_date_label = ttk.Label(root, text="End date (YYYY-MM-DD):")
     end_date_entry = ttk.Entry(root)
     interval_label = ttk.Label(root, text="Select interval:")
-    interval_combobox = ttk.Combobox(
-        root, values=["1d", "1wk", "1mo", "1y"], state="readonly"
-    )
+    interval_combobox = ttk.Combobox(root, values=POSSIBLE_INTERVALS, state="readonly")
 
+    # ___
     # Starting the plot type part
 
-    plot_type = ttk.Combobox(
-        root, values=["candle", "line", "pnf", "renko"], state="readonly"
-    )
+    plot_type_box = ttk.Combobox(root, values=POSSIBLE_PLOT_TYPES, state="readonly")
     plot_type_label = ttk.Label(root, text="Select plot type:")
 
     # Now the moving average part
-    possible_mav = ["5", "10", "20", "50", "100"]
-    selected_mav = ()
     mav = Listbox(
         root,
-        listvariable=StringVar(value=possible_mav),
+        listvariable=StringVar(value=POSSIBLE_MAV),
         selectmode="multiple",
         height=5,
     )
     mav.bind(
         "<<ListboxSelect>>",
-        lambda event: (  # FIXME : the following function is not working
-            update_mav_tuple(mav, possible_mav, selected_mav)
-        ),
+        lambda event: update_mav_tuple(mav, POSSIBLE_MAV),
     )
     mav_label = ttk.Label(root, text="Select moving average:")
 
@@ -61,6 +63,11 @@ def main():
         "key_press_event", lambda event: key_press_handler(event, canvas, toolbar)
     )
 
+    # TODO: putting a legend on the graphs, especially for the MAV
+    # TODO: adding the MACD
+    # TODO: adding the infos of the company
+    # TODO: adding the technical indicators such as RSI, Bollinger Bands, with tooltips
+
     # The analysis button that will trigger the stock analysis when clicked
 
     analysis_button = ttk.Button(
@@ -70,8 +77,9 @@ def main():
             symbol_entry.get(),
             start_date_entry.get(),
             end_date_entry.get(),
-            plot_type.get(),
-            selected_mav,
+            plot_type_box.get(),
+            interval_combobox.get(),
+            update_mav_tuple(mav, POSSIBLE_MAV),
         ),
     )
 
@@ -89,7 +97,7 @@ def main():
     quit_button.grid(row=6, column=1, sticky="e")
     analysis_button.grid(row=6, column=0, sticky="w")
     plot_type_label.grid(row=4, column=0, sticky="w")
-    plot_type.grid(row=4, column=1, sticky="w")
+    plot_type_box.grid(row=4, column=1, sticky="w")
     mav_label.grid(row=5, column=0, sticky="w")
     mav.grid(row=5, column=1, sticky="w")
     root.mainloop()
@@ -100,7 +108,7 @@ def main():
     #
 
 
-def analyze_stock(symbol, start, end, type, mav):
+def analyze_stock(symbol, start, end, type, interval, mav):
     ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
         print(f"No data found for symbol: {symbol}")
@@ -111,50 +119,19 @@ def analyze_stock(symbol, start, end, type, mav):
         type=type,
         mav=mav,
         style="charles",
-        title=f"{symbol} Candlestick Chart",
+        title=f"{symbol} : {type} Chart",
         ylabel="Price",
         volume=True,
     )
     return ochl_data
 
 
-# FIXME : the following function is not working
-def update_mav_tuple(mav, possible_mav, selected_mav):
+def update_mav_tuple(mav, possible_mav):
+    selected_mav = []
     for i in mav.curselection():
-        selected_mav.append(int(possible_mav[i]))
-        print(possible_mav[i])
-    return selected_mav
-
-
-# The following function calculates moving average. They are utilities not used
-# for now.
-
-
-def mm5m(data):
-    mm5 = 0.0
-    data = dict(list(data.items())[1:6])
-    for serie in data.values():
-        mm5 += float(serie["4. close"])
-    mm5 = mm5 / 5
-    return round(mm5, 2)
-
-
-def mm20m(data):
-    mm20 = 0.0
-    data = dict(list(data.items())[1:21])
-    for serie in data.values():
-        mm20 += float(serie["4. close"])
-    mm20 = mm20 / 20
-    return round(mm20, 2)
-
-
-def mm100d(data):
-    mm100 = 0.0
-    data = dict(list(data.items())[1:101])
-    for serie in data.values():
-        mm100 += float(serie["4. close"])
-    mm100 = mm100 / 100
-    return round(mm100, 2)
+        selected_mav.append(int(mav.get(i)))
+    print(f"Selected moving averages: {selected_mav}")
+    return tuple(selected_mav)
 
 
 if __name__ == "__main__":
