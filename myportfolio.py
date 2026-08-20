@@ -5,6 +5,7 @@ import yfinance as yf
 from tkinter import *
 from tkinter import ttk, messagebox as tk_messagebox
 import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -77,9 +78,6 @@ def main():
             symbol_entry.get(),
             start_date_entry.get(),
             end_date_entry.get(),
-            plot_type_box.get(),
-            interval_combobox.get(),
-            update_mav_tuple(mav, POSSIBLE_MAV),
         ),
     )
 
@@ -108,22 +106,31 @@ def main():
     #
 
 
-def analyze_stock(symbol, start, end, type, interval, mav):
+def analyze_stock(symbol, start, end):
     ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
         print(f"No data found for symbol: {symbol}")
         return 1
     print(ochl_data)
-    mpf.plot(
-        ochl_data,
-        type=type,
-        mav=mav,
-        style="charles",
-        title=f"{symbol} : {type} Chart",
-        ylabel="Price",
-        volume=True,
-    )
-    return ochl_data
+    plt.figure()
+    up = ochl_data[ochl_data.Close >= ochl_data.Open]
+    down = ochl_data[ochl_data.Close < ochl_data.Open]
+    col1 = "green"
+    col2 = "red"
+    width = 0.8
+    width2 = 0.08
+    plt.bar(up.index, up.Close - up.Open, width, bottom=up.Open, color=col1)
+    plt.bar(up.index, up.High - up.Close, width2, bottom=up.Close, color=col1)
+    plt.bar(up.index, up.Low - up.Open, width2, bottom=up.Open, color=col1)
+
+    plt.bar(down.index, down.Close - down.Open, width, bottom=down.Open, color=col2)
+    plt.bar(down.index, down.High - down.Open, width2, bottom=down.Open, color=col2)
+    plt.bar(down.index, down.Low - down.Close, width2, bottom=down.Close, color=col2)
+
+    plt.xticks(rotation=30)
+
+    plt.show()
+    return
 
 
 def update_mav_tuple(mav, possible_mav):
