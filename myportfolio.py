@@ -78,6 +78,8 @@ def main():
             symbol_entry.get(),
             start_date_entry.get(),
             end_date_entry.get(),
+            interval_combobox.get(),
+            plot_type_box.get(),
         ),
     )
 
@@ -101,17 +103,26 @@ def main():
     root.mainloop()
 
     # This simple analyse_stock function will plot the chart with the specified
-    # parameters using yfinance to fetch the data and mplfinance to plot the
+    # parameters using yfinance to fetch the data and matplotlib to plot the
     # chart.
-    #
 
 
-def analyze_stock(symbol, start, end):
+def analyze_stock(symbol, start, end, interval, style):
+    # TODO : Select between an interval and a custom period (with starting and end dates)
     ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
+        # TODO:: Messagebox with the error message
         print(f"No data found for symbol: {symbol}")
         return 1
     print(ochl_data)
+    if style == "candle":
+        plot_candle(ochl_data)
+    elif style == "line":
+        plot_line(ochl_data)
+    return
+
+
+def plot_candle(ochl_data):
     plt.figure()
     up = ochl_data[ochl_data.Close >= ochl_data.Open]
     down = ochl_data[ochl_data.Close < ochl_data.Open]
@@ -128,9 +139,15 @@ def analyze_stock(symbol, start, end):
     plt.bar(down.index, down.Low - down.Close, width2, bottom=down.Close, color=col2)
 
     plt.xticks(rotation=30)
-
     plt.show()
-    return
+
+
+def plot_line(ochl_data):
+    plt.figure()
+    col = "blue"
+    plt.plot(ochl_data.index, ochl_data["Close"], color=col)
+    plt.xticks(rotation=30)
+    plt.show()
 
 
 def update_mav_tuple(mav, possible_mav):
