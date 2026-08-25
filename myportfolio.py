@@ -2,14 +2,14 @@
 # import requests
 import pandas as pd
 import yfinance as yf
-from tkinter import *
-from tkinter import ttk, messagebox as tk_messagebox
+from tkinter import StringVar, Tk, Listbox, ttk, messagebox as tk_messagebox
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 import mplfinance as mpf
+import customtkinter as ctk
 
 # ___
 # Defining constants
@@ -35,6 +35,20 @@ def main():
     end_date_entry = ttk.Entry(root)
     interval_label = ttk.Label(root, text="Select interval:")
     interval_combobox = ttk.Combobox(root, values=POSSIBLE_INTERVALS, state="readonly")
+    switchvar = ctk.StringVar(value="on")
+    intervalswitch = ctk.CTkSwitch(
+        root,
+        text="Interval ?",
+        command=interval_activate(
+            switchvar,
+            start_date_entry,
+            end_date_entry,
+            interval_combobox,
+        ),
+        variable=switchvar,
+        onvalue="on",
+        offvalue="off",
+    )
 
     # ___
     # Starting the plot type part
@@ -51,7 +65,7 @@ def main():
     )
     mav.bind(
         "<<ListboxSelect>>",
-        lambda event: update_mav_tuple(mav, POSSIBLE_MAV),
+        lambda event: update_mav_tuple(mav),
     )
     mav_label = ttk.Label(root, text="Select moving average:")
 
@@ -90,6 +104,7 @@ def main():
     start_date_entry.grid(row=1, column=1, sticky="w")
     end_date_label.grid(row=2, column=0, sticky="w")
     end_date_entry.grid(row=2, column=1, sticky="w")
+    intervalswitch.grid(row=3, column=2, sticky="w")
     symbol_entry.grid(row=0, column=1, sticky="w")
     symbol_label.grid(row=0, column=0, sticky="w")
     interval_label.grid(row=3, column=0, sticky="w")
@@ -150,12 +165,27 @@ def plot_line(ochl_data):
     plt.show()
 
 
-def update_mav_tuple(mav, possible_mav):
+def update_mav_tuple(mav):
     selected_mav = []
     for i in mav.curselection():
         selected_mav.append(int(mav.get(i)))
     print(f"Selected moving averages: {selected_mav}")
     return tuple(selected_mav)
+
+
+# FIX : The following function is not working at all. Should disable/enable the
+# interval and the custom dates fields
+
+
+def interval_activate(switchvar, start_date_entry, end_date_entry, interval_combobox):
+    if switchvar == "on":
+        start_date_entry.state(["disabled"])
+        end_date_entry.state(["disabled"])
+        interval_combobox.state(["!disabled"])
+    else:
+        start_date_entry.state(["!disabled"])
+        end_date_entry.state(["!disabled"])
+        interval_combobox.state(["disabled"])
 
 
 if __name__ == "__main__":
