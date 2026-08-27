@@ -15,7 +15,7 @@ import customtkinter as ctk
 # Defining constants
 
 POSSIBLE_MAV = ["10", "20", "50", "100", "200"]
-POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "1y"]
+POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "6mo", "1y"]
 POSSIBLE_PLOT_TYPES = ["candle", "line", "pnf", "renko"]
 
 # ___
@@ -30,25 +30,19 @@ def main():
     symbol_label = ttk.Label(root, text="Enter stock symbol:")
     symbol_entry = ttk.Entry(root)
     start_date_label = ttk.Label(root, text="Start date (YYYY-MM-DD):")
-    start_date_entry = ttk.Entry(root)
+    start_date_entry = ttk.Entry(root, state="disabled")
     end_date_label = ttk.Label(root, text="End date (YYYY-MM-DD):")
-    end_date_entry = ttk.Entry(root)
+    end_date_entry = ttk.Entry(root, state="disabled")
     interval_label = ttk.Label(root, text="Select interval:")
-    interval_combobox = ttk.Combobox(root, values=POSSIBLE_INTERVALS, state="readonly")
-    switchvar = ctk.StringVar(value="on")
+    interval_combobox = ttk.Combobox(root, values=POSSIBLE_INTERVALS, state="normal")
     intervalswitch = ctk.CTkSwitch(
         root,
         text="Interval ?",
-        command=interval_activate(
-            switchvar,
-            start_date_entry,
-            end_date_entry,
-            interval_combobox,
+        command=lambda: invert_activation(
+            interval_combobox, start_date_entry, end_date_entry
         ),
-        variable=switchvar,
-        onvalue="on",
-        offvalue="off",
     )
+    intervalswitch.select()
 
     # ___
     # Starting the plot type part
@@ -75,6 +69,9 @@ def main():
     toolbar.update()
     # TODO : the integration part
     canvas.mpl_connect(
+        "key_press_event", lambda event: print(f"you pressed {event.key}")
+    )
+    canvas.mpl_connect(
         "key_press_event", lambda event: key_press_handler(event, canvas, toolbar)
     )
 
@@ -99,7 +96,7 @@ def main():
 
     # Positioning the widgets in the grid
 
-    frame.grid(row=0, column=0, sticky="w")
+    frame.grid(row=7, column=0, sticky="w")
     start_date_label.grid(row=1, column=0, sticky="w")
     start_date_entry.grid(row=1, column=1, sticky="w")
     end_date_label.grid(row=2, column=0, sticky="w")
@@ -115,6 +112,8 @@ def main():
     plot_type_box.grid(row=4, column=1, sticky="w")
     mav_label.grid(row=5, column=0, sticky="w")
     mav.grid(row=5, column=1, sticky="w")
+    toolbar.grid(row=7, column=0, sticky="w")
+    canvas.get_tk_widget().grid(row=8, column=0, sticky="w")
     root.mainloop()
 
     # This simple analyse_stock function will plot the chart with the specified
@@ -123,10 +122,11 @@ def main():
 
 
 def analyze_stock(symbol, start, end, interval, style):
+    # TODO : All the sanity checks for the inputs
     # TODO : Select between an interval and a custom period (with starting and end dates)
     ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
-        # TODO:: Messagebox with the error message
+        tk_messagebox.showerror(title="Error", message=f"No data found for {symbol}")
         print(f"No data found for symbol: {symbol}")
         return 1
     print(ochl_data)
@@ -173,19 +173,29 @@ def update_mav_tuple(mav):
     return tuple(selected_mav)
 
 
-# FIX : The following function is not working at all. Should disable/enable the
-# interval and the custom dates fields
+def invert_activation(w1, w2, w3):
+    # print("states at the beginning :")
+    # print(f"w1[state] = {w1['state']}")
+    # print(f"w2[state] = {w2['state']}")
+    # print(f"w3[state] = {w3['state']}")
+    # print(f"repr = {w1['state']!r}, type = {type(w1['state'])}")
+    # print(f"comparaison == 'disabled' : {w1['state'] == 'disabled'}")
 
-
-def interval_activate(switchvar, start_date_entry, end_date_entry, interval_combobox):
-    if switchvar == "on":
-        start_date_entry.state(["disabled"])
-        end_date_entry.state(["disabled"])
-        interval_combobox.state(["!disabled"])
+    if w1.instate(["disabled"]):
+        # print("BRANCHE IF")
+        w2.config(state="disabled")
+        w3.config(state="disabled")
+        w1.config(state="normal")
     else:
-        start_date_entry.state(["!disabled"])
-        end_date_entry.state(["!disabled"])
-        interval_combobox.state(["disabled"])
+        # print("BRANCHE ELSE")
+        w2.config(state="normal")
+        w3.config(state="normal")
+        w1.config(state="disabled")
+
+    # print("states at the end :")
+    # print(f"w1[state] = {w1['state']}")
+    # print(f"w2[state] = {w2['state']}")
+    # print(f"w3[state] = {w3['state']}")
 
 
 if __name__ == "__main__":
