@@ -1,5 +1,6 @@
 # import json
 # import requests
+from matplotlib import text
 import pandas as pd
 import yfinance as yf
 from tkinter import StringVar, Tk, Listbox, ttk, messagebox as tk_messagebox
@@ -7,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.figure import Figure
 import mplfinance as mpf
 import customtkinter as ctk
 
@@ -18,25 +18,31 @@ POSSIBLE_MAV = ["10", "20", "50", "100", "200"]
 POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "6mo", "1y"]
 POSSIBLE_PLOT_TYPES = ["candle", "line", "pnf", "renko"]
 
-# ___
-
 
 def main():
     # User interface setup, starting with the basic widgets
     root = Tk()
+    symbol = StringVar()
+    start_date = StringVar()
+    end_date = StringVar()
+    interval = StringVar()
+    plot_type = StringVar()
     root.title("MyPortfolio : Personal Stock Technical Analysis")
     frame = ttk.Frame(root, relief="ridge", padding=5)
-    quit_button = ttk.Button(root, text="Quit", command=root.destroy)
-    symbol_label = ttk.Label(root, text="Enter stock symbol:")
-    symbol_entry = ttk.Entry(root)
-    start_date_label = ttk.Label(root, text="Start date (YYYY-MM-DD):")
-    start_date_entry = ttk.Entry(root, state="disabled")
-    end_date_label = ttk.Label(root, text="End date (YYYY-MM-DD):")
-    end_date_entry = ttk.Entry(root, state="disabled")
-    interval_label = ttk.Label(root, text="Select interval:")
-    interval_combobox = ttk.Combobox(root, values=POSSIBLE_INTERVALS, state="normal")
+    plot_frame = ttk.Frame(root, padding=5)
+    quit_button = ttk.Button(frame, text="Quit", command=root.destroy)
+    symbol_label = ttk.Label(frame, text="Enter stock symbol:")
+    symbol_entry = ttk.Entry(frame, textvariable=symbol)
+    start_date_label = ttk.Label(frame, text="Start date (YYYY-MM-DD):")
+    start_date_entry = ttk.Entry(frame, state="disabled", textvariable=start_date)
+    end_date_label = ttk.Label(frame, text="End date (YYYY-MM-DD):")
+    end_date_entry = ttk.Entry(frame, state="disabled", textvariable=end_date)
+    interval_label = ttk.Label(frame, text="Select interval:")
+    interval_combobox = ttk.Combobox(
+        frame, values=POSSIBLE_INTERVALS, state="normal", textvariable=interval
+    )
     intervalswitch = ctk.CTkSwitch(
-        root,
+        frame,
         text="Interval ?",
         command=lambda: invert_activation(
             interval_combobox, start_date_entry, end_date_entry
@@ -47,12 +53,14 @@ def main():
     # ___
     # Starting the plot type part
 
-    plot_type_box = ttk.Combobox(root, values=POSSIBLE_PLOT_TYPES, state="readonly")
-    plot_type_label = ttk.Label(root, text="Select plot type:")
+    plot_type_box = ttk.Combobox(
+        frame, values=POSSIBLE_PLOT_TYPES, state="readonly", textvariable=plot_type
+    )
+    plot_type_label = ttk.Label(frame, text="Select plot type:")
 
     # Now the moving average part
     mav = Listbox(
-        root,
+        frame,
         listvariable=StringVar(value=POSSIBLE_MAV),
         selectmode="multiple",
         height=5,
@@ -61,20 +69,14 @@ def main():
         "<<ListboxSelect>>",
         lambda event: update_mav_tuple(mav),
     )
-    mav_label = ttk.Label(root, text="Select moving average:")
+    mav_label = ttk.Label(frame, text="Select moving average:")
 
-    canvas = FigureCanvasTkAgg(Figure(figsize=(5, 4), dpi=100), master=root)
-    canvas.draw()
-    toolbar = NavigationToolbar2Tk(canvas, root, pack_toolbar=False)
+    # Drawing the canvas using matplotlib's explicit method
+
+    fig, ax = plt.subplots(figsize=(7, 3))
+    canvas = FigureCanvasTkAgg(fig, plot_frame)
+    toolbar = NavigationToolbar2Tk(canvas, plot_frame, pack_toolbar=False)
     toolbar.update()
-    # TODO : the integration part
-    canvas.mpl_connect(
-        "key_press_event", lambda event: print(f"you pressed {event.key}")
-    )
-    canvas.mpl_connect(
-        "key_press_event", lambda event: key_press_handler(event, canvas, toolbar)
-    )
-
     # TODO: putting a legend on the graphs, especially for the MAV
     # TODO: adding the MACD
     # TODO: adding the infos of the company
@@ -83,37 +85,40 @@ def main():
     # The analysis button that will trigger the stock analysis when clicked
 
     analysis_button = ttk.Button(
-        root,
+        frame,
         text="Analyze",
         command=lambda: analyze_stock(
+            canvas,
             symbol_entry.get(),
-            start_date_entry.get(),
-            end_date_entry.get(),
-            interval_combobox.get(),
-            plot_type_box.get(),
+            start_date.get(),
+            end_date.get(),
+            interval.get(),
+            plot_type.get(),
         ),
     )
 
     # Positioning the widgets in the grid
 
-    frame.grid(row=7, column=0, sticky="w")
+    frame.grid(row=0, column=0, sticky="nsew")
+    plot_frame.grid(row=1, column=0, sticky="nsew")
     start_date_label.grid(row=1, column=0, sticky="w")
     start_date_entry.grid(row=1, column=1, sticky="w")
     end_date_label.grid(row=2, column=0, sticky="w")
     end_date_entry.grid(row=2, column=1, sticky="w")
-    intervalswitch.grid(row=3, column=2, sticky="w")
+    intervalswitch.grid(row=1, column=2, sticky="w")
     symbol_entry.grid(row=0, column=1, sticky="w")
     symbol_label.grid(row=0, column=0, sticky="w")
-    interval_label.grid(row=3, column=0, sticky="w")
-    interval_combobox.grid(row=3, column=1, sticky="w")
-    quit_button.grid(row=6, column=1, sticky="e")
+    interval_label.grid(row=0, column=2, sticky="w")
+    interval_combobox.grid(row=0, column=3, sticky="w")
+    quit_button.grid(row=6, column=1, sticky="w")
     analysis_button.grid(row=6, column=0, sticky="w")
-    plot_type_label.grid(row=4, column=0, sticky="w")
-    plot_type_box.grid(row=4, column=1, sticky="w")
-    mav_label.grid(row=5, column=0, sticky="w")
-    mav.grid(row=5, column=1, sticky="w")
-    toolbar.grid(row=7, column=0, sticky="w")
-    canvas.get_tk_widget().grid(row=8, column=0, sticky="w")
+    plot_type_label.grid(row=2, column=2, sticky="w")
+    plot_type_box.grid(row=2, column=3, sticky="w")
+    mav_label.grid(row=0, column=4, sticky="w")
+    mav.grid(row=0, column=5, sticky="w")
+    toolbar.grid(row=0, column=0, sticky="w")
+    canvas.get_tk_widget().grid(row=1, column=0, sticky="nsew")
+    symbol_entry.focus()
     root.mainloop()
 
     # This simple analyse_stock function will plot the chart with the specified
@@ -121,24 +126,30 @@ def main():
     # chart.
 
 
-def analyze_stock(symbol, start, end, interval, style):
+def analyze_stock(canvas, symbol, start, end, interval, style):
     # TODO : All the sanity checks for the inputs
     # TODO : Select between an interval and a custom period (with starting and end dates)
+    if symbol == "":
+        tk_messagebox.showerror(title="Error", message="Invalid symbol")
+        return 1
+    if style == "":
+        tk_messagebox.showerror(title="Error", message="Invalid plot type")
+        return 1
     ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
         tk_messagebox.showerror(title="Error", message=f"No data found for {symbol}")
         print(f"No data found for symbol: {symbol}")
         return 1
+
     print(ochl_data)
     if style == "candle":
         plot_candle(ochl_data)
     elif style == "line":
-        plot_line(ochl_data)
+        plot_line(canvas, ochl_data)
     return
 
 
 def plot_candle(ochl_data):
-    plt.figure()
     up = ochl_data[ochl_data.Close >= ochl_data.Open]
     down = ochl_data[ochl_data.Close < ochl_data.Open]
     col1 = "green"
@@ -154,15 +165,16 @@ def plot_candle(ochl_data):
     plt.bar(down.index, down.Low - down.Close, width2, bottom=down.Close, color=col2)
 
     plt.xticks(rotation=30)
-    plt.show()
 
 
-def plot_line(ochl_data):
-    plt.figure()
-    col = "blue"
-    plt.plot(ochl_data.index, ochl_data["Close"], color=col)
-    plt.xticks(rotation=30)
-    plt.show()
+def plot_line(canvas, ochl_data):
+    canvas.figure.clear()
+    axe = canvas.figure.add_subplot()
+    axe.plot(
+        ochl_data.index,
+        ochl_data["Close"],
+    )
+    canvas.draw()
 
 
 def update_mav_tuple(mav):
