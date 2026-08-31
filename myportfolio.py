@@ -27,6 +27,7 @@ def main():
     end_date = StringVar()
     interval = StringVar()
     plot_type = StringVar()
+    mav = StringVar(value=POSSIBLE_MAV)
     root.title("MyPortfolio : Personal Stock Technical Analysis")
     frame = ttk.Frame(root, relief="ridge", padding=5)
     plot_frame = ttk.Frame(root, padding=5)
@@ -39,7 +40,7 @@ def main():
     end_date_entry = ttk.Entry(frame, state="disabled", textvariable=end_date)
     interval_label = ttk.Label(frame, text="Select interval:")
     interval_combobox = ttk.Combobox(
-        frame, values=POSSIBLE_INTERVALS, state="normal", textvariable=interval
+        frame, values=POSSIBLE_INTERVALS, state="readonly", textvariable=interval
     )
     intervalswitch = ctk.CTkSwitch(
         frame,
@@ -59,21 +60,21 @@ def main():
     plot_type_label = ttk.Label(frame, text="Select plot type:")
 
     # Now the moving average part
-    mav = Listbox(
+    mav_listbox = Listbox(
         frame,
-        listvariable=StringVar(value=POSSIBLE_MAV),
+        listvariable=mav,
         selectmode="multiple",
         height=5,
     )
-    mav.bind(
+    mav_listbox.bind(
         "<<ListboxSelect>>",
-        lambda event: update_mav_tuple(mav),
+        lambda event: update_mav_tuple(mav_listbox),
     )
     mav_label = ttk.Label(frame, text="Select moving average:")
 
     # Drawing the canvas using matplotlib's explicit method
 
-    fig, ax = plt.subplots(figsize=(7, 3))
+    fig, ax = plt.subplots(figsize=(7, 3.3))
     canvas = FigureCanvasTkAgg(fig, plot_frame)
     toolbar = NavigationToolbar2Tk(canvas, plot_frame, pack_toolbar=False)
     toolbar.update()
@@ -94,6 +95,8 @@ def main():
             end_date.get(),
             interval.get(),
             plot_type.get(),
+            intervalswitch.get(),
+            update_mav_tuple(mav_listbox),
         ),
     )
 
@@ -115,7 +118,7 @@ def main():
     plot_type_label.grid(row=2, column=2, sticky="w")
     plot_type_box.grid(row=2, column=3, sticky="w")
     mav_label.grid(row=0, column=4, sticky="w")
-    mav.grid(row=0, column=5, sticky="w")
+    mav_listbox.grid(row=0, column=5, sticky="w", rowspan=3)
     toolbar.grid(row=0, column=0, sticky="w")
     canvas.get_tk_widget().grid(row=1, column=0, sticky="nsew")
     symbol_entry.focus()
@@ -126,55 +129,66 @@ def main():
     # chart.
 
 
-def analyze_stock(canvas, symbol, start, end, interval, style):
+def analyze_stock(canvas, symbol, start, end, interval, style, switch, mav):
     # TODO : All the sanity checks for the inputs
-    # TODO : Select between an interval and a custom period (with starting and end dates)
     if symbol == "":
         tk_messagebox.showerror(title="Error", message="Invalid symbol")
         return 1
     if style == "":
         tk_messagebox.showerror(title="Error", message="Invalid plot type")
         return 1
-    ochl_data = yf.Ticker(symbol).history(start=start, end=end)
+    if switch == 1:
+        if interval == "":
+            tk_messagebox.showerror("Error", message="Invalid interval")
+            return 1
+        ochl_data = yf.Ticker(symbol).history(period=interval)
+    else:
+        if start == "" or end == "":
+            tk_messagebox.showerror("Error", message="Invalid start and/or end dates")
+            return 1
+        ochl_data = yf.Ticker(symbol).history(start=start, end=end)
     if ochl_data.empty:
         tk_messagebox.showerror(title="Error", message=f"No data found for {symbol}")
         print(f"No data found for symbol: {symbol}")
         return 1
-
     print(ochl_data)
+    canvas.figure.clear()
+    axe = canvas.figure.subplots()
     if style == "candle":
-        plot_candle(ochl_data)
+        plot_candle(axe, ochl_data)
     elif style == "line":
-        plot_line(canvas, ochl_data)
+        plot_line(axe, ochl_data)
+    for mean in mav:
+        plot_mav(axe, ochl_data, mean)
+    canvas.draw()
     return
 
 
-def plot_candle(ochl_data):
+def plot_candle(axe, ochl_data):
     up = ochl_data[ochl_data.Close >= ochl_data.Open]
     down = ochl_data[ochl_data.Close < ochl_data.Open]
     col1 = "green"
     col2 = "red"
     width = 0.8
     width2 = 0.08
-    plt.bar(up.index, up.Close - up.Open, width, bottom=up.Open, color=col1)
-    plt.bar(up.index, up.High - up.Close, width2, bottom=up.Close, color=col1)
-    plt.bar(up.index, up.Low - up.Open, width2, bottom=up.Open, color=col1)
+    axe.bar(up.index, up.Close - up.Open, width, bottom=up.Open, color=col1)
+    axe.bar(up.index, up.High - up.Close, width2, bottom=up.Close, color=col1)
+    axe.bar(up.index, up.Low - up.Open, width2, bottom=up.Open, color=col1)
 
-    plt.bar(down.index, down.Close - down.Open, width, bottom=down.Open, color=col2)
-    plt.bar(down.index, down.High - down.Open, width2, bottom=down.Open, color=col2)
-    plt.bar(down.index, down.Low - down.Close, width2, bottom=down.Close, color=col2)
-
-    plt.xticks(rotation=30)
+    axe.bar(down.index, down.Close - down.Open, width, bottom=down.Open, color=col2)
+    axe.bar(down.index, down.High - down.Open, width2, bottom=down.Open, color=col2)
+    axe.bar(down.index, down.Low - down.Close, width2, bottom=down.Close, color=col2)
 
 
-def plot_line(canvas, ochl_data):
-    canvas.figure.clear()
-    axe = canvas.figure.add_subplot()
+def plot_line(axe, ochl_data):
     axe.plot(
         ochl_data.index,
         ochl_data["Close"],
     )
-    canvas.draw()
+
+
+def plot_mav(axe, ochl_data, mav):
+    axe.plot(ochl_data.index, mm(ochl_data, mav))
 
 
 def update_mav_tuple(mav):
@@ -186,28 +200,50 @@ def update_mav_tuple(mav):
 
 
 def invert_activation(w1, w2, w3):
-    # print("states at the beginning :")
-    # print(f"w1[state] = {w1['state']}")
-    # print(f"w2[state] = {w2['state']}")
-    # print(f"w3[state] = {w3['state']}")
-    # print(f"repr = {w1['state']!r}, type = {type(w1['state'])}")
-    # print(f"comparaison == 'disabled' : {w1['state'] == 'disabled'}")
 
     if w1.instate(["disabled"]):
-        # print("BRANCHE IF")
         w2.config(state="disabled")
         w3.config(state="disabled")
         w1.config(state="normal")
     else:
-        # print("BRANCHE ELSE")
         w2.config(state="normal")
         w3.config(state="normal")
         w1.config(state="disabled")
 
-    # print("states at the end :")
-    # print(f"w1[state] = {w1['state']}")
-    # print(f"w2[state] = {w2['state']}")
-    # print(f"w3[state] = {w3['state']}")
+
+# The following functions calculate moving average.
+
+
+def mm(data, period):
+    print(data["Close"].rolling(period).mean())
+    return data["Close"].rolling(period).mean()
+
+
+def mm5(data):
+    mm5 = 0.0
+    data = dict(list(data.items())[1:6])
+    for serie in data.values():
+        mm5 += float(serie["Close"])
+    mm5 = mm5 / 5
+    return round(mm5, 2)
+
+
+def mm20(data):
+    mm20 = 0.0
+    data = dict(list(data.items())[1:21])
+    for serie in data.values():
+        mm20 += float(serie["Close"])
+    mm20 = mm20 / 20
+    return round(mm20, 2)
+
+
+def mm100(data):
+    mm100 = 0.0
+    data = dict(list(data.items())[1:101])
+    for serie in data.values():
+        mm100 += float(serie["Close"])
+    mm100 = mm100 / 100
+    return round(mm100, 2)
 
 
 if __name__ == "__main__":
