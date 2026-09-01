@@ -15,7 +15,7 @@ import customtkinter as ctk
 # Defining constants
 
 POSSIBLE_MAV = ["10", "20", "50", "100", "200"]
-POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "6mo", "1y"]
+POSSIBLE_INTERVALS = ["1d", "1wk", "1mo", "6mo", "1y", "2y", "5y", "10y"]
 POSSIBLE_PLOT_TYPES = ["candle", "line", "pnf", "renko"]
 
 
@@ -78,7 +78,7 @@ def main():
     canvas = FigureCanvasTkAgg(fig, plot_frame)
     toolbar = NavigationToolbar2Tk(canvas, plot_frame, pack_toolbar=False)
     toolbar.update()
-    # TODO: putting a legend on the graphs, especially for the MAV
+    # TODO : adding the tendancy lines
     # TODO: adding the MACD
     # TODO: adding the infos of the company
     # TODO: adding the technical indicators such as RSI, Bollinger Bands, with tooltips
@@ -102,8 +102,12 @@ def main():
 
     # Positioning the widgets in the grid
 
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(1, weight=1)
     frame.grid(row=0, column=0, sticky="nsew")
     plot_frame.grid(row=1, column=0, sticky="nsew")
+    plot_frame.rowconfigure(1, weight=1)
+    plot_frame.columnconfigure(0, weight=1)
     start_date_label.grid(row=1, column=0, sticky="w")
     start_date_entry.grid(row=1, column=1, sticky="w")
     end_date_label.grid(row=2, column=0, sticky="w")
@@ -124,7 +128,7 @@ def main():
     symbol_entry.focus()
     root.mainloop()
 
-    # This simple analyse_stock function will plot the chart with the specified
+    # This analyse_stock function will plot the chart with the specified
     # parameters using yfinance to fetch the data and matplotlib to plot the
     # chart.
 
@@ -154,12 +158,16 @@ def analyze_stock(canvas, symbol, start, end, interval, style, switch, mav):
     print(ochl_data)
     canvas.figure.clear()
     axe = canvas.figure.subplots()
+    axe.set_title(f"{symbol}")
+    axe.set_xlabel("Date")
+    axe.set_ylabel("Price")
     if style == "candle":
         plot_candle(axe, ochl_data)
     elif style == "line":
         plot_line(axe, ochl_data)
     for mean in mav:
         plot_mav(axe, ochl_data, mean)
+    axe.legend()
     canvas.draw()
     return
 
@@ -181,26 +189,31 @@ def plot_candle(axe, ochl_data):
 
 
 def plot_line(axe, ochl_data):
+    col = "blue"
     axe.plot(
         ochl_data.index,
         ochl_data["Close"],
+        label="Symbol price (line)",
+        color=col,
+        linewidth=0.8,
     )
 
 
 def plot_mav(axe, ochl_data, mav):
-    axe.plot(ochl_data.index, mm(ochl_data, mav))
+    axe.plot(
+        ochl_data.index, mm(ochl_data, mav), label=f"MAV : {mav} periods", linewidth=0.8
+    )
 
 
-def update_mav_tuple(mav):
+def update_mav_tuple(mav: Listbox) -> tuple:
     selected_mav = []
     for i in mav.curselection():
         selected_mav.append(int(mav.get(i)))
-    print(f"Selected moving averages: {selected_mav}")
+    # print(f"Selected moving averages: {selected_mav}")
     return tuple(selected_mav)
 
 
-def invert_activation(w1, w2, w3):
-
+def invert_activation(w1: ttk.Combobox, w2: ttk.Entry, w3: ttk.Entry):
     if w1.instate(["disabled"]):
         w2.config(state="disabled")
         w3.config(state="disabled")
@@ -214,36 +227,33 @@ def invert_activation(w1, w2, w3):
 # The following functions calculate moving average.
 
 
-def mm(data, period):
+def mm(data: pd.DataFrame, period: int) -> pd.Series:
+    """Calculates the simple moving average for the specified period"""
+
     print(data["Close"].rolling(period).mean())
     return data["Close"].rolling(period).mean()
 
 
-def mm5(data):
-    mm5 = 0.0
-    data = dict(list(data.items())[1:6])
-    for serie in data.values():
-        mm5 += float(serie["Close"])
-    mm5 = mm5 / 5
-    return round(mm5, 2)
-
-
-def mm20(data):
-    mm20 = 0.0
-    data = dict(list(data.items())[1:21])
-    for serie in data.values():
-        mm20 += float(serie["Close"])
-    mm20 = mm20 / 20
-    return round(mm20, 2)
-
-
-def mm100(data):
-    mm100 = 0.0
-    data = dict(list(data.items())[1:101])
-    for serie in data.values():
-        mm100 += float(serie["Close"])
-    mm100 = mm100 / 100
-    return round(mm100, 2)
+def find_pivots(closes: pd.Series, n: int) -> tuple[list[int], list[int]]:
+    """First step before plotting the tendancies : find local max and local min.
+    It uses an "n" int which represent the number of sessions from which we
+    want to evaluate the local pivot.
+    """
+    holes = []
+    peak = []
+    for i in range(n, len(closes) - n):
+        if all(closes.iloc[i] > closes.iloc[i - j] for j in range(1, n + 1)) and all(
+            closes.iloc[i] >= closes.iloc[i + j] for j in range(1, n + 1)
+        ):
+            peak.append(closes.iloc[i])
+            # print(f"new peak : {closes[i]}")
+    for i in range(len(closes)):
+        if all(closes.iloc[i] < closes.iloc[i - j] for j in range(1, n + 1)) and all(
+            closes.iloc[i] <= closes.iloc[i + j] for j in range(1, n + 1)
+        ):
+            holes.append(closes.iloc[i])
+            # print(f"new hole : {closes[i]}")
+    return (holes, peak)
 
 
 if __name__ == "__main__":
